@@ -1,3 +1,5 @@
+from typing import List
+
 import scrapy
 
 
@@ -93,6 +95,20 @@ class CoursesSpider(scrapy.Spider):
             lesson_index,
             lesson_title,
         )
+
+        breadcrumb_links = response.xpath(
+            "(//ul[contains(@class, 'p-breadcrumbs')])[1]/li/a"
+        )
+        breadcrumbs = [
+            name
+            for link in breadcrumb_links
+            for name in link.xpath("span[@itemprop='name']/text()").getall()
+            if name != "Home"
+        ]
+
+        tags = response.css("dl.tagList dd a.tagItem::text")
+        tags = [tag.strip() for tag in tags.getall()]
+
         download_link = response.xpath(
             "//li[@id='lesson-actions']//a[contains(@href, '/download')]"
         )
@@ -106,6 +122,9 @@ class CoursesSpider(scrapy.Spider):
                 "section_title": section_title,
                 "lesson_index": lesson_index,
                 "lesson_title": lesson_title,
+                "lesson_url": response.url,
+                "breadcrumbs": breadcrumbs,
+                "tags": tags,
             },
         )
 
@@ -117,6 +136,9 @@ class CoursesSpider(scrapy.Spider):
         section_title: str,
         lesson_index: int,
         lesson_title: str,
+        lesson_url: str,
+        tags: List[str],
+        breadcrumbs: List[str],
     ):
         self.logger.debug(
             "Downloading lesson, %s -> %d - %s -> %d - %s",
@@ -132,5 +154,8 @@ class CoursesSpider(scrapy.Spider):
             "section_title": section_title,
             "lesson_index": lesson_index,
             "lesson_title": lesson_title,
-            "url": response.url,
+            "lesson_url": lesson_url,
+            "download_url": response.url,
+            "breadcrumbs": breadcrumbs,
+            "tags": tags,
         }
