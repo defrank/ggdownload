@@ -4,7 +4,10 @@ _default:
     @just --list
 
 # Setup developer environment.
-setup:
+setup: install
+
+# Poetry install.
+install:
     poetry install
 
 # Crawl using the specified spider.
