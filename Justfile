@@ -3,6 +3,10 @@ set dotenv-load := true
 _default:
     @just --list
 
+# Setup developer environment.
+setup:
+    poetry install
+
 # Crawl using the specified spider.
 crawl SPIDER="courses":
     poetry run scrapy crawl \
