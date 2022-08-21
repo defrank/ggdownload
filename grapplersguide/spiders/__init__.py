@@ -1,7 +1,35 @@
 import urllib.parse
-from typing import List
+from typing import FrozenSet, NamedTuple, Optional, Tuple
 
 import scrapy
+
+
+class Expert(NamedTuple):
+    name: str
+
+
+class Course(NamedTuple):
+    title: str
+    expert: Expert
+
+
+class Section(NamedTuple):
+    position: int
+    title: str
+    course: Course
+
+
+class Lesson(NamedTuple):
+    position: int
+    title: str
+    url: str
+    section: Section
+    breadcrumbs: Optional[Tuple[str, ...]] = None
+    tags: Optional[FrozenSet[str]] = None
+
+
+class Download(NamedTuple):
+    download_url: str
 
 
 class CoursesSpider(scrapy.Spider):
@@ -44,72 +72,63 @@ class CoursesSpider(scrapy.Spider):
             yield scrapy.Request(
                 url=response.urljoin(courses_path),
                 callback=self.parse_courses,
-                cb_kwargs={"expert": expert},
+                cb_kwargs={"expert": Expert(name=expert)},
             )
 
-    def parse_courses(self, response, expert: str):
+    def parse_courses(self, response, expert: Expert):
         self.logger.debug("Parsing courses for expert, %s", expert)
         course_links = response.css("div.node-main div.node-title > a")
         for link in course_links:
             title = link.xpath("text()").get()
             course_path = link.attrib["href"]
+            course = Course(title=title, expert=expert)
             yield scrapy.Request(
                 url=response.urljoin(course_path),
                 callback=self.parse_course,
-                cb_kwargs={"title": title, "expert": expert},
+                cb_kwargs={"course": course},
             )
 
-    def parse_course(self, response, title: str, expert: str):
-        self.logger.debug("Parsing course, %s, by expert, %s", title, expert)
+    def parse_course(self, response, course: Course):
+        self.logger.debug("Parsing course: %s", course)
         lesson_sections = response.css("div.block-container")
         for section_index, section in enumerate(lesson_sections, 1):
             section_title = section.css("h2.block-header > a::text").get()
             lesson_links = section.css("h3.node-title > a")
+            section = Section(
+                position=section_index,
+                title=section_title,
+                course=course,
+            )
             for link_index, link in enumerate(lesson_links, 1):
                 lesson_title = link.xpath("text()").get()
                 lesson_path = link.attrib["href"]
+                lesson = Lesson(
+                    position=link_index,
+                    title=lesson_title,
+                    url=link,
+                    section=section,
+                )
                 yield scrapy.Request(
                     url=response.urljoin(lesson_path),
                     callback=self.parse_lesson,
-                    cb_kwargs={
-                        "course_title": title,
-                        "section_index": section_index,
-                        "section_title": section_title,
-                        "lesson_index": link_index,
-                        "lesson_title": lesson_title,
-                    },
+                    cb_kwargs={"lesson": lesson},
                 )
 
-    def parse_lesson(
-        self,
-        response,
-        course_title: str,
-        section_index: int,
-        section_title: str,
-        lesson_index: int,
-        lesson_title: str,
-    ):
-        self.logger.debug(
-            "Parsing lesson, %s -> %d - %s -> %d - %s",
-            course_title,
-            section_index,
-            section_title,
-            lesson_index,
-            lesson_title,
-        )
+    def parse_lesson(self, response, lesson: Lesson):
+        self.logger.debug("Parsing lesson: %s", lesson)
 
         breadcrumb_links = response.xpath(
             "(//ul[contains(@class, 'p-breadcrumbs')])[1]/li/a"
         )
-        breadcrumbs = [
+        breadcrumbs = tuple(
             name
             for link in breadcrumb_links
             for name in link.xpath("span[@itemprop='name']/text()").getall()
             if name != "Home"
-        ]
+        )
 
         tags = response.css("dl.tagList dd a.tagItem::text")
-        tags = [tag.strip() for tag in tags.getall()]
+        tags = frozenset(tag.strip() for tag in tags.getall())
 
         download_link = response.xpath(
             "//li[@id='lesson-actions']//a[contains(@href, '/download')]"
@@ -117,39 +136,16 @@ class CoursesSpider(scrapy.Spider):
         download_path = download_link.attrib["href"]
         yield scrapy.Request(
             url=response.urljoin(download_path),
-            callback=self.parse_download,
+            callback=self.parse_download_page,
             cb_kwargs={
-                "course_title": course_title,
-                "section_index": section_index,
-                "section_title": section_title,
-                "lesson_index": lesson_index,
-                "lesson_title": lesson_title,
-                "lesson_url": response.url,
-                "breadcrumbs": breadcrumbs,
-                "tags": tags,
+                "lesson": lesson._replace(breadcrumbs=breadcrumbs, tags=tags),
             },
         )
 
-    def parse_download(
-        self,
-        response,
-        course_title: str,
-        section_index: int,
-        section_title: str,
-        lesson_index: int,
-        lesson_title: str,
-        lesson_url: str,
-        tags: List[str],
-        breadcrumbs: List[str],
-    ):
-        self.logger.debug(
-            "Parsing download page, %s -> %d - %s -> %d - %s",
-            course_title,
-            section_index,
-            section_title,
-            lesson_index,
-            lesson_title,
-        )
+    def parse_download_page(self, response, lesson: Lesson):
+        assert lesson.breadcrumbs is not None, "breadcrumbs must be a tuple"
+        assert lesson.tags is not None, "tags must be a frozenset"
+        self.logger.debug("Parsing download page: %s", lesson)
         url = urllib.parse.urlsplit(response.url)
         _, user_id, resource, some_other_id, video_id = url.path.split("/")
         assert resource == "download", f"Want `download`, got `{resource}`"
@@ -160,26 +156,8 @@ class CoursesSpider(scrapy.Spider):
             url=response.urljoin(f"{path}?{query_string}"),
             headers=headers,
             callback=self.parse_download_data,
-            cb_kwargs={
-                "course_title": course_title,
-                "section_index": section_index,
-                "section_title": section_title,
-                "lesson_index": lesson_index,
-                "lesson_title": lesson_title,
-                "lesson_url": lesson_url,
-                "download_url": response.url,
-                "breadcrumbs": breadcrumbs,
-                "tags": tags,
-            },
+            cb_kwargs={"lesson": lesson},
         )
 
-    def parse_download_data(
-        self,
-        response,
-        **kwargs,
-    ):
-        self.logger.debug(
-            "Parsing download data for %s: %s",
-            response.url,
-            response.text,
-        )
+    def parse_download_data(self, response, lesson: Lesson):
+        self.logger.debug("Parsing download data: %s", lesson)
