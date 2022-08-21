@@ -1,3 +1,4 @@
+import urllib.parse
 from typing import List
 
 import scrapy
@@ -9,6 +10,7 @@ class CoursesSpider(scrapy.Spider):
         "grapplersguide.com",
         "thestrikersguide.com",
         "theweaponsguide.com",
+        "vimeo.com",
     ]
     login_urls = [
         "https://grapplersguide.com/second-portal/login",
@@ -141,21 +143,43 @@ class CoursesSpider(scrapy.Spider):
         breadcrumbs: List[str],
     ):
         self.logger.debug(
-            "Downloading lesson, %s -> %d - %s -> %d - %s",
+            "Parsing download page, %s -> %d - %s -> %d - %s",
             course_title,
             section_index,
             section_title,
             lesson_index,
             lesson_title,
         )
-        yield {
-            "course_title": course_title,
-            "section_index": section_index,
-            "section_title": section_title,
-            "lesson_index": lesson_index,
-            "lesson_title": lesson_title,
-            "lesson_url": lesson_url,
-            "download_url": response.url,
-            "breadcrumbs": breadcrumbs,
-            "tags": tags,
-        }
+        url = urllib.parse.urlsplit(response.url)
+        _, user_id, resource, some_other_id, video_id = url.path.split("/")
+        assert resource == "download", f"Want `download`, got `{resource}`"
+        path = f"/{user_id}/{resource}/data/{some_other_id}/{video_id}"
+        query_string = urllib.parse.urlencode({"action": "load_download_data"})
+        headers = {"x-requested-with": "XMLHttpRequest"}
+        yield scrapy.Request(
+            url=response.urljoin(f"{path}?{query_string}"),
+            headers=headers,
+            callback=self.parse_download_data,
+            cb_kwargs={
+                "course_title": course_title,
+                "section_index": section_index,
+                "section_title": section_title,
+                "lesson_index": lesson_index,
+                "lesson_title": lesson_title,
+                "lesson_url": lesson_url,
+                "download_url": response.url,
+                "breadcrumbs": breadcrumbs,
+                "tags": tags,
+            },
+        )
+
+    def parse_download_data(
+        self,
+        response,
+        **kwargs,
+    ):
+        self.logger.debug(
+            "Parsing download data for %s: %s",
+            response.url,
+            response.text,
+        )
