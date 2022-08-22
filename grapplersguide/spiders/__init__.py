@@ -1,4 +1,5 @@
 import dataclasses as dc
+import operator as op
 import urllib.parse
 from typing import FrozenSet, Optional, Tuple
 
@@ -35,7 +36,17 @@ class Lesson:
 
 @dc.dataclass(frozen=True)
 class Download:
+    file_name: str
+    public_name: str
+    base_file_name: str
+    extension: str
+    download_name: str
+    size: str
+    height: int
+    width: int
+    video_file_id: str
     download_url: str
+    lesson: Lesson
 
 
 class CoursesSpider(scrapy.Spider):
@@ -171,3 +182,15 @@ class CoursesSpider(scrapy.Spider):
 
     def parse_download_data(self, response, lesson: Lesson):
         self.logger.debug("Parsing download data: %s", lesson)
+        data = response.json()
+        files = data["download_config"]["files"]
+        highest_quality_file = max(files, key=op.itemgetter("height"))
+        download_fields = {field.name for field in dc.fields(Download)}
+        yield Download(
+            lesson=lesson,
+            **{
+                key: value
+                for key, value in highest_quality_file
+                if key in download_fields
+            },
+        )
