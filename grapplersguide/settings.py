@@ -13,7 +13,7 @@ SPIDER_MODULES = ["grapplersguide.spiders"]
 NEWSPIDER_MODULE = "grapplersguide.spiders"
 
 
-# Crawl responsibly by identifying yourself (and your website) on the user-agent
+# Crawl responsibly by identifying yourself (and website) on the user-agent
 # USER_AGENT = 'grapplersguide (+http://www.yourdomain.com)'
 
 # Obey robots.txt rules
@@ -38,7 +38,7 @@ ROBOTSTXT_OBEY = True
 
 # Override the default request headers:
 # DEFAULT_REQUEST_HEADERS = {
-#   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+#   'Accept': '*/*',
 #   'Accept-Language': 'en',
 # }
 
@@ -79,8 +79,8 @@ ROBOTSTXT_OBEY = True
 # Enable showing throttling stats for every response received:
 # AUTOTHROTTLE_DEBUG = False
 
-# Enable and configure HTTP caching (disabled by default)
-# See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html#httpcache-middleware-settings
+# Enable and configure HTTP caching (disabled by default). See
+# https://docs.scrapy.org/en/latest/topics/downloader-middleware.html#httpcache-middleware-settings
 # HTTPCACHE_ENABLED = True
 # HTTPCACHE_EXPIRATION_SECS = 0
 # HTTPCACHE_DIR = 'httpcache'
