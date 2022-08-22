@@ -122,7 +122,7 @@ class CoursesSpider(scrapy.Spider):
                 lesson = Lesson(
                     position=link_index,
                     title=lesson_title,
-                    url=link,
+                    url=response.urljoin(link.attrib["href"]),
                     section=section,
                 )
                 yield scrapy.Request(
