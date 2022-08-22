@@ -190,7 +190,7 @@ class CoursesSpider(scrapy.Spider):
             lesson=lesson,
             **{
                 key: value
-                for key, value in highest_quality_file
+                for key, value in highest_quality_file.items()
                 if key in download_fields
             },
         )
