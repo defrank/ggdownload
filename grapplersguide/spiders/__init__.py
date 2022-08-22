@@ -1,25 +1,30 @@
+import dataclasses as dc
 import urllib.parse
-from typing import FrozenSet, NamedTuple, Optional, Tuple
+from typing import FrozenSet, Optional, Tuple
 
 import scrapy
 
 
-class Expert(NamedTuple):
+@dc.dataclass(frozen=True)
+class Expert:
     name: str
 
 
-class Course(NamedTuple):
+@dc.dataclass(frozen=True)
+class Course:
     title: str
     expert: Expert
 
 
-class Section(NamedTuple):
+@dc.dataclass(frozen=True)
+class Section:
     position: int
     title: str
     course: Course
 
 
-class Lesson(NamedTuple):
+@dc.dataclass(frozen=True)
+class Lesson:
     position: int
     title: str
     url: str
@@ -28,7 +33,8 @@ class Lesson(NamedTuple):
     tags: Optional[FrozenSet[str]] = None
 
 
-class Download(NamedTuple):
+@dc.dataclass(frozen=True)
+class Download:
     download_url: str
 
 
@@ -138,7 +144,11 @@ class CoursesSpider(scrapy.Spider):
             url=response.urljoin(download_path),
             callback=self.parse_download_page,
             cb_kwargs={
-                "lesson": lesson._replace(breadcrumbs=breadcrumbs, tags=tags),
+                "lesson": dc.replace(
+                    lesson,
+                    breadcrumbs=breadcrumbs,
+                    tags=tags,
+                ),
             },
         )
 
