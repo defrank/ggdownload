@@ -51,9 +51,14 @@ ROBOTSTXT_OBEY = True
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
-# DOWNLOADER_MIDDLEWARES = {
-#    'grapplersguide.middlewares.GrapplersGuideDownloaderMiddleware': 543,
-# }
+DOWNLOADER_MIDDLEWARES = {
+    "scrapy.downloadermiddlewares.redirect.RedirectMiddleware": 543,
+}
+REDIRECT_ENABLED = True
+# See
+# https://docs.scrapy.org/en/latest/topics/media-pipeline.html#allowing-redirections
+MEDIA_ALLOW_REDIRECTS = True
+LESSONVIDEOSPIPELINE_MEDIA_ALLOW_REDIRECTS = True
 
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html

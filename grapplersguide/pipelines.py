@@ -39,6 +39,9 @@ class LessonVideosPipeline(scrapy.pipelines.files.FilesPipeline):
         self._output_dir = pathlib.Path(output_dir).resolve()
         self._flat_output = flat_output
         super().__init__(store_uri=self._output_dir.as_uri())
+        # TODO(dfrank): Fix allowing redirects from settings
+        self.allow_redirects = True
+        self._handle_statuses(self.allow_redirects)
 
     @fn.cached_property
     def logger(self):
@@ -100,7 +103,7 @@ class LessonVideosPipeline(scrapy.pipelines.files.FilesPipeline):
         )
         path.parent.mkdir(parents=True, exist_ok=True)
         self.logger.debug("Built file path: %s", path)
-        return path
+        return path.as_posix()
 
     def get_media_requests(self, item: items.Video, info):
         self.logger.debug(
