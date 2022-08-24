@@ -41,7 +41,6 @@ class ExpertCoursesSpider(scrapy.Spider):
         self.logger.debug("Starting requests...")
         for url in self.login_urls:
             yield scrapy.Request(url=url, callback=self.parse_login)
-            return
 
     def parse_login(self, response):
         self.logger.debug("Logging in...")
@@ -63,7 +62,6 @@ class ExpertCoursesSpider(scrapy.Spider):
                 callback=self.parse_courses,
                 cb_kwargs={"expert": items.Expert(name=expert)},
             )
-            return
 
     def parse_courses(self, response, expert: items.Expert):
         self.logger.debug("Parsing courses for expert, %s", expert)
@@ -77,7 +75,6 @@ class ExpertCoursesSpider(scrapy.Spider):
                 callback=self.parse_course,
                 cb_kwargs={"course": course},
             )
-            return
 
     def parse_course(self, response, course: items.Course):
         self.logger.debug("Parsing course: %s", course)
@@ -104,7 +101,6 @@ class ExpertCoursesSpider(scrapy.Spider):
                     callback=self.parse_lesson,
                     cb_kwargs={"lesson": lesson},
                 )
-                return
 
     def parse_lesson(self, response, lesson: items.Lesson):
         self.logger.debug("Parsing lesson: %s", lesson)
