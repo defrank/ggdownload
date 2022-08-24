@@ -26,3 +26,9 @@ pytest = "^5.2"
 
 [tool.poetry.scripts]
 gg = "grapplersguide.__main__:app"
+
+[tool.mypy]
+# ignore_missing_imports = true
+no_implicit_optional = true
+scripts_are_modules = true
+plugins = []
