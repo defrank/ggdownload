@@ -3,7 +3,8 @@
 # See documentation in:
 # https://docs.scrapy.org/en/latest/topics/items.html
 import dataclasses as dc
-from typing import FrozenSet, List, Optional, Tuple
+import pathlib
+from typing import FrozenSet, Optional, Tuple
 
 
 @dc.dataclass(frozen=True)
@@ -45,5 +46,6 @@ class Video:
     height: int
     width: int
     video_file_id: str
-    download_url: List[str]
+    download_url: str
     lesson: Lesson
+    download_path: Optional[pathlib.Path] = None

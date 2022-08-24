@@ -5,17 +5,26 @@
 #
 # useful for handling different item types with a single interface
 # from itemadapter import ItemAdapter
+import dataclasses as dc
 import functools as fn
 import logging
 import pathlib
 from typing import Optional, Union
 
 import itemadapter
-import scrapy.crawler
 import scrapy.http
 import scrapy.pipelines.files
+import scrapy.settings
 
 from . import items, spiders
+
+
+def _get_output_dir(settings: scrapy.settings.Settings) -> pathlib.Path:
+    return settings.get("OUTPUT_DIR", pathlib.Path.cwd())
+
+
+def _get_flat_output(settings: scrapy.settings.Settings):
+    return settings.getbool("FLAT_OUTPUT", default=False)
 
 
 class LessonVideosPipeline(scrapy.pipelines.files.FilesPipeline):
@@ -25,10 +34,11 @@ class LessonVideosPipeline(scrapy.pipelines.files.FilesPipeline):
     def __init__(
         self,
         output_dir: Union[str, pathlib.Path],
-        flat_output: bool = False,
+        flat_output: bool,
     ):
         self._output_dir = pathlib.Path(output_dir).resolve()
         self._flat_output = flat_output
+        super().__init__(store_uri=self._output_dir.as_uri())
 
     @fn.cached_property
     def logger(self):
@@ -49,6 +59,8 @@ class LessonVideosPipeline(scrapy.pipelines.files.FilesPipeline):
         item: items.Video,
         spider: spiders.ExpertCoursesSpider,
     ):
+        if not isinstance(item, items.Video):
+            raise scrapy.exceptions.DropItem(item)
         self.logger.debug(
             "Processing %s spider lesson: %s",
             spider.name,
@@ -64,14 +76,31 @@ class LessonVideosPipeline(scrapy.pipelines.files.FilesPipeline):
         *,
         item: Optional[items.Video] = None,
     ):
-        self.logger.debug(
-            "Building file path for request=%s response=%s info=%s item=%s",
-            request,
-            response,
-            info,
-            item,
+        if not isinstance(item, items.Video):
+            raise scrapy.exceptions.DropItem(f"item is not a video: {item}")
+
+        video = item
+        lesson = video.lesson
+        section = lesson.section
+        course = section.course
+        expert = course.expert
+        path = (
+            self._output_dir
+            / expert.name
+            / course.title
+            / f"{section.position:02d} - {section.title}"
+            / " ".join(
+                [
+                    f"{lesson.position:02d}",
+                    "-",
+                    lesson.title,
+                    f"({video.public_name}).{video.extension}",
+                ]
+            )
         )
-        return super().file_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.logger.debug("Built file path: %s", path)
+        return path
 
     def get_media_requests(self, item: items.Video, info):
         self.logger.debug(
@@ -83,24 +112,42 @@ class LessonVideosPipeline(scrapy.pipelines.files.FilesPipeline):
         yield scrapy.Request(adapter["download_url"])
 
     def item_completed(self, results, item: items.Video, info):
+        if not results:
+            raise scrapy.exceptions.DropItem(
+                f"Nothing downloaded for item: {item}",
+            )
+        for ok, result in results:
+            if isinstance(result, BaseException):
+                self.logger.critical(
+                    "Unhandled error downloading item: %s",
+                    item,
+                    exc_info=result,
+                )
+                raise scrapy.exceptions.CloseSpider(
+                    reason=result.__class__.__name__,
+                ) from result
+            elif not ok:
+                raise scrapy.exceptions.DropItem(
+                    f"Failed to download {item}: {result}",
+                )
+
         self.logger.debug(
             "Item is complete: results=%s item=%s info=%s",
             results,
             item,
             info,
         )
-        # video_path = next(result["path"] for ok, result in results if ok)
-        return super().item_completed()
+        video_path = next(result["path"] for ok, result in results if ok)
+        return dc.replace(item, download_path=video_path)
 
     def close_spider(self, spider: spiders.ExpertCoursesSpider):
         self.logger.debug("Closing %s spider", spider.name)
-        super().close_spider(spider)
 
     @classmethod
-    def from_crawler(cls, crawler: scrapy.crawler.Crawler):
+    def from_settings(cls, settings: scrapy.settings.Settings):
         return cls(
-            output_dir=crawler.settings.get("OUTPUT_DIR"),
-            flat_output=crawler.settings.get("FLAT_OUTPUT"),
+            output_dir=_get_output_dir(settings),
+            flat_output=_get_flat_output(settings),
         )
 
 
@@ -136,7 +183,7 @@ class CourseIndexPipeline:
         spider: spiders.ExpertCoursesSpider,
     ):
         self.logger.debug(
-            "Processing %s spider lesson: %s",
+            "Processing %s spider item: %s",
             spider.name,
             item,
         )
@@ -151,10 +198,8 @@ class CourseIndexPipeline:
         self._index_file.close()
 
     @classmethod
-    def from_crawler(cls, crawler: scrapy.crawler.Crawler):
-        return cls(
-            output_dir=crawler.settings.get("OUTPUT_DIR"),
-        )
+    def from_settings(cls, settings: scrapy.settings.Settings):
+        return cls(output_dir=_get_output_dir(settings))
 
     @staticmethod
     def _header(video: items.Video):
