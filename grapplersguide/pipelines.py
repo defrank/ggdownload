@@ -40,7 +40,7 @@ class LessonVideosPipeline(scrapy.pipelines.files.FilesPipeline):
         flat_output: bool,
     ):
         self._output_dir = pathlib.Path(output_dir).resolve()
-        self._flat_output = flat_output
+        self._flat_output = flat_output  # TODO(dfrank): Support flat output
         super().__init__(store_uri=self._output_dir.as_uri())
         # TODO(dfrank): Fix allowing redirects from settings
         self.allow_redirects = True
