@@ -8,6 +8,7 @@
 import dataclasses as dc
 import functools as fn
 import logging
+import os.path
 import pathlib
 from typing import Optional, Union
 
@@ -87,23 +88,21 @@ class LessonVideosPipeline(scrapy.pipelines.files.FilesPipeline):
         section = lesson.section
         course = section.course
         expert = course.expert
-        path = (
-            self._output_dir
-            / expert.name
-            / course.title
-            / f"{section.position:02d} - {section.title}"
-            / " ".join(
+        relative_path = os.path.join(
+            expert.name,
+            course.title,
+            f"{section.position:02d} - {section.title}",
+            " ".join(
                 [
                     f"{lesson.position:02d}",
                     "-",
                     lesson.title,
                     f"({video.public_name}).{video.extension}",
                 ]
-            )
+            ),
         )
-        path.parent.mkdir(parents=True, exist_ok=True)
-        self.logger.debug("Built file path: %s", path)
-        return path.as_posix()
+        self.logger.debug("Built relative file path: %s", relative_path)
+        return relative_path
 
     def get_media_requests(self, item: items.Video, info):
         self.logger.debug(
@@ -148,6 +147,8 @@ class LessonVideosPipeline(scrapy.pipelines.files.FilesPipeline):
 
     @classmethod
     def from_settings(cls, settings: scrapy.settings.Settings):
+        logger = logging.getLogger(f"{__name__}.{cls.__name__}")
+        logger.debug("Files store: %s", settings.get("FILES_STORE"))
         return cls(
             output_dir=_get_output_dir(settings),
             flat_output=_get_flat_output(settings),
