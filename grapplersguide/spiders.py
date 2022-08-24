@@ -32,9 +32,8 @@ class ExpertCoursesSpider(scrapy.Spider):
     ):
         self._username = username
         self._password = password
-        # TODO(defrank): Support regex filters
-        self._expert_regex = re.compile(expert_regex)
-        self._course_regex = re.compile(course_regex)
+        self._expert_regex = re.compile(expert_regex, flags=re.IGNORECASE)
+        self._course_regex = re.compile(course_regex, flags=re.IGNORECASE)
         super().__init__()
 
     def start_requests(self):
@@ -55,21 +54,36 @@ class ExpertCoursesSpider(scrapy.Spider):
         # response.css("select#topic option")
         options = response.xpath("//select[@id='expert']/option[@value!='']")
         for option in options:
-            expert = option.xpath("text()").get()
+            expert_name = option.xpath("text()").get()
+            expert = items.Expert(name=expert_name)
+            if self._expert_regex.search(expert.name) is None:
+                self.logger.debug(
+                    "Skipping %s because name does not match %s",
+                    expert,
+                    self._expert_regex,
+                )
+                continue
             courses_path = option.attrib["value"]
             yield scrapy.Request(
                 url=response.urljoin(courses_path),
                 callback=self.parse_courses,
-                cb_kwargs={"expert": items.Expert(name=expert)},
+                cb_kwargs={"expert": expert},
             )
 
     def parse_courses(self, response, expert: items.Expert):
         self.logger.debug("Parsing courses for expert, %s", expert)
         course_links = response.css("div.node-main div.node-title > a")
         for link in course_links:
-            title = link.xpath("text()").get()
+            course_title = link.xpath("text()").get()
             course_path = link.attrib["href"]
-            course = items.Course(title=title, expert=expert)
+            course = items.Course(title=course_title, expert=expert)
+            if self._course_regex.search(course.title) is None:
+                self.logger.debug(
+                    "Skipping %s because title does not match %s",
+                    course,
+                    self._course_regex,
+                )
+                continue
             yield scrapy.Request(
                 url=response.urljoin(course_path),
                 callback=self.parse_course,
