@@ -64,7 +64,8 @@ ROBOTSTXT_OBEY = True
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-    "grapplersguide.pipelines.CoursePipeline": 300,
+    "grapplersguide.pipelines.LessonVideosPipeline": 1,
+    "grapplersguide.pipelines.CourseIndexPipeline": 20,
 }
 FILES_STORE = tempfile.mkdtemp()
 
