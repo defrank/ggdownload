@@ -6,6 +6,7 @@
 #     https://docs.scrapy.org/en/latest/topics/settings.html
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
+import tempfile
 
 BOT_NAME = "grapplersguide"
 
@@ -65,6 +66,7 @@ ROBOTSTXT_OBEY = True
 ITEM_PIPELINES = {
     "grapplersguide.pipelines.CoursePipeline": 300,
 }
+FILES_STORE = tempfile.mkdtemp()
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
