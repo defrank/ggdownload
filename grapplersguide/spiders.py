@@ -32,6 +32,7 @@ class ExpertCoursesSpider(scrapy.Spider):
     ):
         self._username = username
         self._password = password
+        # TODO(defrank): Support regex filters
         self._expert_regex = re.compile(expert_regex)
         self._course_regex = re.compile(course_regex)
         super().__init__()

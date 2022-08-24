@@ -7,10 +7,12 @@
 # from itemadapter import ItemAdapter
 import dataclasses as dc
 import functools as fn
+import itertools as it
 import logging
+import operator as op
 import os.path
 import pathlib
-from typing import Optional, Union
+from typing import List, NamedTuple, Optional, Union
 
 import itemadapter
 import scrapy.http
@@ -155,7 +157,16 @@ class LessonVideosPipeline(scrapy.pipelines.files.FilesPipeline):
         )
 
 
+class ExpertIndexItem(NamedTuple):
+    expert: items.Expert
+    course: items.Course
+    section: items.Section
+    lesson: items.Lesson
+    video: items.Video
+
+
 class CourseIndexPipeline:
+    _expert_index: List[ExpertIndexItem]
     _index_path: pathlib.Path
     _output_dir: pathlib.Path
 
@@ -178,8 +189,8 @@ class CourseIndexPipeline:
             spider.name,
             self._output_dir,
         )
+        self._expert_index = []
         self._index_path.touch()
-        self._index_file = self._index_path.open("wt")
 
     def process_item(
         self,
@@ -191,32 +202,58 @@ class CourseIndexPipeline:
             spider.name,
             item,
         )
-
-        if not self._index_file.tell():
-            self._index_file.write(self._header(item))
+        video = item
+        lesson = video.lesson
+        section = lesson.section
+        course = section.course
+        expert = course.expert
+        self._expert_index.append(
+            ExpertIndexItem(
+                expert,
+                course,
+                section,
+                lesson,
+                video,
+            )
+        )
 
         return item
 
     def close_spider(self, spider: spiders.ExpertCoursesSpider):
         self.logger.debug("Closing %s spider", spider.name)
-        self._index_file.close()
+
+        self._expert_index.sort()
+        with self._index_path.open("wt") as md:
+            md.write("# Grapplers Guide\n")
+            md.write("\n")
+            for expert, course_index in it.groupby(
+                self._expert_index, key=op.attrgetter("expert")
+            ):
+                md.write(f"## {expert.name}\n")
+                md.write("\n")
+                for course, section_index in it.groupby(
+                    course_index, key=op.attrgetter("course")
+                ):
+                    md.write(f"### {course.title}\n")
+                    md.write("\n")
+                    md.write(f"- Expert: {expert.name}\n")
+                    md.write("\n")
+                    for section, lesson_index in it.groupby(
+                        section_index, key=op.attrgetter("section")
+                    ):
+                        md.write(f"#### {section.title}\n")
+                        md.write("\n")
+                        for lesson, video in it.groupby(
+                            lesson_index, key=op.attrgetter("lesson")
+                        ):
+                            breadcrumbs = " -> ".join(lesson.breadcrumbs)
+                            tags = ", ".join(lesson.tags)
+                            md.write(f"##### {lesson.title}\n")
+                            md.write("\n")
+                            md.write(f"- Breadcrumbs: {breadcrumbs}\n")
+                            md.write(f"- Tags: {tags}\n")
+                            md.write("\n")
 
     @classmethod
     def from_settings(cls, settings: scrapy.settings.Settings):
         return cls(output_dir=_get_output_dir(settings))
-
-    @staticmethod
-    def _header(video: items.Video):
-        lesson = video.lesson
-        section = lesson.section
-        course = section.course
-        expert = course.expert
-
-        return "\n".join(
-            [
-                f"# {course.title}",
-                f"Expert: {expert.name}",
-                "",
-                "",
-            ]
-        )
