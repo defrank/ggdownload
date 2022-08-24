@@ -2,6 +2,7 @@ import dataclasses as dc
 import operator as op
 import re
 import urllib.parse
+from typing import Union
 
 import scrapy
 
@@ -19,13 +20,15 @@ class ExpertCoursesSpider(scrapy.Spider):
     login_urls = [
         "https://grapplersguide.com/second-portal/login",
     ]
+    _course_regex: re.Pattern
+    _expert_regex: re.Pattern
 
     def __init__(
         self,
         username: str,
         password: str,
-        expert_regex: str = r".+",
-        course_regex: str = r".+",
+        expert_regex: Union[str, re.Pattern] = re.compile(r".+"),
+        course_regex: Union[str, re.Pattern] = re.compile(r".+"),
     ):
         self._username = username
         self._password = password
